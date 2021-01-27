@@ -149,6 +149,10 @@ namespace PianoRoll {
             KeyDown += new KeyEventHandler(picRoll_KeyDown);
             KeyUp += new KeyEventHandler(picRoll_KeyUp);
 
+            DispTrack.Add(1);
+            DispTrack.Add(2);
+            DispTrack.Add(3);
+            DispTrack.Add(4);
             hScroll.Minimum = 0;
             hScroll.Maximum = 960 * 4 * 16;
             var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\Media\\onestop.mid");
@@ -867,6 +871,17 @@ namespace PianoRoll {
             if (noteOnList.Count == 0) {
                 mEventList.Add(new Event(mTimeBegin, EditTrack, 0, E_STATUS.NOTE_ON, mToneBegin, 127));
                 mEventList.Add(new Event(mTimeEnd, EditTrack, 0, E_STATUS.NOTE_OFF, mToneBegin, 0));
+            } else {
+                var neighbor = noteOnList[0];
+                foreach(var n in noteOnList) {
+                    if (n.begin < neighbor.begin) {
+                        neighbor = n;
+                    }
+                }
+                if (mTimeBegin < neighbor.begin) {
+                    mEventList.Add(new Event(mTimeBegin, EditTrack, 0, E_STATUS.NOTE_ON, mToneBegin, 127));
+                    mEventList.Add(new Event(neighbor.begin, EditTrack, 0, E_STATUS.NOTE_OFF, mToneBegin, 0));
+                }
             }
         }
 
