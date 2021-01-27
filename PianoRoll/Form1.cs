@@ -39,15 +39,17 @@ namespace PianoRoll {
             public bool isEditTrack;
             public int begin;
             public int end;
+            public int status;
             public int data1;
             public int data2;
-            public DrawEvent(E_DRAW_EVENT type, bool isEditTrack, int begin, params int[] data) {
+            public DrawEvent(E_DRAW_EVENT type, bool isEditTrack, int begin, params byte[] data) {
                 this.isEditTrack = isEditTrack;
                 this.type = type;
                 this.begin = begin;
                 end = -1;
-                data1 = 1 <= data.Length ? data[0] : 0;
-                data2 = 2 <= data.Length ? data[1] : 0;
+                status = 1 <= data.Length ? data[0] : 0;
+                data1 = 2 <= data.Length ? data[1] : 0;
+                data2 = 3 <= data.Length ? data[2] : 0;
             }
         }
 
@@ -132,6 +134,9 @@ namespace PianoRoll {
 
         private List<Event> mEventList = new List<Event>();
 
+        public List<int> DispTrack = new List<int>();
+        public int EditTrack = 9;
+
         public Form1() {
             InitializeComponent();
             setSize();
@@ -144,18 +149,18 @@ namespace PianoRoll {
             KeyDown += new KeyEventHandler(picRoll_KeyDown);
             KeyUp += new KeyEventHandler(picRoll_KeyUp);
 
-            var s = new SMF.SMF("C:\\Users\\owner\\Desktop\\X01751G22GS.MID");
-            foreach(var e in s.EventList) {
+            hScroll.Minimum = 0;
+            hScroll.Maximum = 960 * 4 * 16;
+            var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\Media\\onestop.mid");
+            foreach (var e in s.EventList) {
                 mEventList.Add(e);
             }
-
-            hScroll.Minimum = 0;
             hScroll.Maximum = s.MaxTime;
 
             timer1.Interval = 16;
             timer1.Enabled = true;
             timer1.Start();
-            vScroll.Value = vScroll.Minimum < 92 ? 92 : vScroll.Minimum;
+            vScroll.Value = vScroll.Minimum < 80 ? 80 : vScroll.Minimum;
         }
 
         private void Form1_SizeChanged(object sender, EventArgs e) {
@@ -557,6 +562,12 @@ namespace PianoRoll {
             picRoll.Top = 0;
             picRoll.Width = vScroll.Left;
             picRoll.Height = hScroll.Top;
+            if (picRoll.Width == 0) {
+                picRoll.Width = 1;
+            }
+            if (picRoll.Height == 0) {
+                picRoll.Height = 1;
+            }
 
             picMesureBar.Left = 0;
             picMesureBar.Top = toolStrip1.Bottom;
@@ -825,8 +836,38 @@ namespace PianoRoll {
         }
 
         private void addNoteEvent() {
-            mEventList.Add(new Event(mTimeBegin, 0, 0, E_STATUS.NOTE_ON, mToneBegin, 127));
-            mEventList.Add(new Event(mTimeEnd, 0, 0, E_STATUS.NOTE_OFF, mToneBegin, 0));
+            var noteOnList = new List<DrawEvent>();
+            foreach (var ev in mEventList) {
+                if (ev.Track != EditTrack) {
+                    continue;
+                }
+                switch (ev.Type) {
+                case E_STATUS.NOTE_OFF:
+                    for (int i = 0; i < noteOnList.Count; i++) {
+                        var dispEv = noteOnList[i];
+                        if (dispEv.data1 == ev.Data[1]) {
+                            if (dispEv.end == -1) {
+                                dispEv.end = ev.Tick;
+                                if (mTimeEnd <= dispEv.begin || dispEv.end <= mTimeBegin) {
+                                    noteOnList.RemoveAt(i);
+                                    i--;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case E_STATUS.NOTE_ON:
+                    if (mToneBegin == ev.Data[1] && ev.Tick < mTimeEnd) {
+                        noteOnList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, true, ev.Tick, ev.Data));
+                    }
+                    break;
+                }
+            }
+
+            if (noteOnList.Count == 0) {
+                mEventList.Add(new Event(mTimeBegin, EditTrack, 0, E_STATUS.NOTE_ON, mToneBegin, 127));
+                mEventList.Add(new Event(mTimeEnd, EditTrack, 0, E_STATUS.NOTE_OFF, mToneBegin, 0));
+            }
         }
 
         private void putDrawEvents() {
@@ -851,7 +892,12 @@ namespace PianoRoll {
                     break;
                 case E_STATUS.NOTE_ON:
                     if (ev.Tick <= endTime) {
-                        dispNoteList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, ev.Track == 1, ev.Tick, ev.Data[1]));
+                        if (ev.Track == EditTrack) {
+                            dispNoteList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, true, ev.Tick, ev.Data));
+                        }
+                        if (DispTrack.Contains(ev.Track)) {
+                            dispNoteList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, false, ev.Tick, ev.Data));
+                        }
                     }
                     break;
                 }
