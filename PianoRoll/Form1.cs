@@ -14,46 +14,37 @@ using SMF;
 
 namespace PianoRoll {
     public partial class Form1 : Form {
-        private enum E_DRAW_EVENT {
-            NOTE,
-            INST,
-            VOL,
-            EXP,
-            PAN,
-            PITCH,
-            VIB,
-            VIB_RATE,
-            REV,
-            CHO,
-            DEL_DEP,
-            DEL_TIME,
-            CUTOFF,
-            RESONANCE,
-            ATTACK,
-            RELEASE,
-            TEMPO
+        private enum E_MEASURE {
+            MEASURE,
+            BEAT,
+            SUB
         }
 
-        private class DrawEvent {
-            public E_DRAW_EVENT type;
+        private struct DrawMeasure {
+            public E_MEASURE Type;
+            public int Tick;
+            public int Numerator;
+            public int Denominator;
+            public int Number;
+        }
+
+        private struct DrawNote {
             public bool isEditTrack;
             public int begin;
             public int end;
-            public int status;
             public int data1;
             public int data2;
-            public DrawEvent(E_DRAW_EVENT type, bool isEditTrack, int begin, params byte[] data) {
+            public DrawNote(bool isEditTrack, int begin, params byte[] data) {
                 this.isEditTrack = isEditTrack;
-                this.type = type;
                 this.begin = begin;
                 end = -1;
-                status = 1 <= data.Length ? data[0] : 0;
                 data1 = 2 <= data.Length ? data[1] : 0;
                 data2 = 3 <= data.Length ? data[2] : 0;
             }
         }
 
-        private List<DrawEvent> mDrawEventList = new List<DrawEvent>();
+        private List<DrawMeasure> mDrawMeasureList = new List<DrawMeasure>();
+        private List<DrawNote> mDrawNoteList = new List<DrawNote>();
 
         private static readonly Dictionary<string, int> Snaps = new Dictionary<string, int> {
             { "4分",    960 },
@@ -155,7 +146,7 @@ namespace PianoRoll {
             DispTrack.Add(4);
             hScroll.Minimum = 0;
             hScroll.Maximum = 960 * 4 * 16;
-            var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\Media\\onestop.mid");
+            var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\MIDI-master\\lilium作業中2.mid");
             foreach (var e in s.EventList) {
                 mEventList.Add(e);
             }
@@ -732,37 +723,40 @@ namespace PianoRoll {
             }
 
             putDrawEvents();
-            foreach (var ev in mDrawEventList) {
-                int x1, x2;
-                int y1, y2;
-                switch (ev.type) {
-                case E_DRAW_EVENT.NOTE:
-                    var tone = 127 + vScroll.Minimum - vScroll.Value - ev.data1;
-                    x1 = (ev.begin - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
-                    x2 = (ev.end - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
-                    y1 = mToneHeight * tone + ofsY;
-                    y2 = mToneHeight * (tone + 1) + ofsY;
-                    if (!ev.isEditTrack) {
-                        drawBackNote(x1, y1, x2, y2);
-                    }
+
+            foreach (var ev in mDrawMeasureList) {
+                var x = (ev.Tick - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
+                switch (ev.Type) {
+                case E_MEASURE.MEASURE:
+                    mgRoll.DrawLine(Pens.Black, x, 0, x, mBmpRoll.Height);
+                    break;
+                case E_MEASURE.BEAT:
+                    mgRoll.DrawLine(Gray75, x, 0, x, mBmpRoll.Height);
                     break;
                 }
             }
-            foreach (var ev in mDrawEventList) {
-                int x1, x2;
-                int y1, y2;
-                switch (ev.type) {
-                case E_DRAW_EVENT.NOTE:
-                    var tone = 127 + vScroll.Minimum - vScroll.Value - ev.data1;
-                    x1 = (ev.begin - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
-                    x2 = (ev.end - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
-                    y1 = mToneHeight * tone + ofsY;
-                    y2 = mToneHeight * (tone + 1) + ofsY;
-                    if (ev.isEditTrack) {
-                        drawNote(x1, y1, x2, y2);
-                    }
-                    break;
+
+            foreach (var ev in mDrawNoteList) {
+                if (ev.isEditTrack) {
+                    continue;
                 }
+                var tone = 127 + vScroll.Minimum - vScroll.Value - ev.data1;
+                var x1 = (ev.begin - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
+                var x2 = (ev.end - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
+                var y1 = mToneHeight * tone + ofsY;
+                var y2 = mToneHeight * (tone + 1) + ofsY;
+                drawBackNote(x1, y1, x2, y2);
+            }
+            foreach (var ev in mDrawNoteList) {
+                if (!ev.isEditTrack) {
+                    continue;
+                }
+                var tone = 127 + vScroll.Minimum - vScroll.Value - ev.data1;
+                var x1 = (ev.begin - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
+                var x2 = (ev.end - snapTimeScroll()) * QuarterNoteWidth / mTimeScale;
+                var y1 = mToneHeight * tone + ofsY;
+                var y2 = mToneHeight * (tone + 1) + ofsY;
+                drawNote(x1, y1, x2, y2);
             }
 
 
@@ -840,7 +834,7 @@ namespace PianoRoll {
         }
 
         private void addNoteEvent() {
-            var noteOnList = new List<DrawEvent>();
+            var noteOnList = new List<DrawNote>();
             foreach (var ev in mEventList) {
                 if (ev.Track != EditTrack) {
                     continue;
@@ -862,7 +856,7 @@ namespace PianoRoll {
                     break;
                 case E_STATUS.NOTE_ON:
                     if (mToneBegin == ev.Data[1] && ev.Tick < mTimeEnd) {
-                        noteOnList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, true, ev.Tick, ev.Data));
+                        noteOnList.Add(new DrawNote(true, ev.Tick, ev.Data));
                     }
                     break;
                 }
@@ -886,10 +880,10 @@ namespace PianoRoll {
         }
 
         private void putDrawEvents() {
-            mDrawEventList.Clear();
+            mDrawNoteList.Clear();
             var beginTime = snapTimeScroll();
             var endTime = snapTimeScroll(mBmpRoll.Width);
-            var dispNoteList = new List<DrawEvent>();
+            var dispNoteList = new List<DrawNote>();
             foreach (var ev in mEventList) {
                 switch (ev.Type) {
                 case E_STATUS.NOTE_OFF:
@@ -898,7 +892,7 @@ namespace PianoRoll {
                         if (dispEv.data1 == ev.Data[1]) {
                             if (beginTime <= ev.Tick) {
                                 dispEv.end = ev.Tick;
-                                mDrawEventList.Add(dispEv);
+                                mDrawNoteList.Add(dispEv);
                             }
                             dispNoteList.RemoveAt(i);
                             i--;
@@ -908,14 +902,76 @@ namespace PianoRoll {
                 case E_STATUS.NOTE_ON:
                     if (ev.Tick <= endTime) {
                         if (ev.Track == EditTrack) {
-                            dispNoteList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, true, ev.Tick, ev.Data));
+                            dispNoteList.Add(new DrawNote(true, ev.Tick, ev.Data));
                         }
                         if (DispTrack.Contains(ev.Track)) {
-                            dispNoteList.Add(new DrawEvent(E_DRAW_EVENT.NOTE, false, ev.Tick, ev.Data));
+                            dispNoteList.Add(new DrawNote(false, ev.Tick, ev.Data));
                         }
                     }
                     break;
                 }
+            }
+
+            var mesureList = new List<DrawMeasure>();
+            foreach (var ev in mEventList) {
+                if (ev.Type == E_STATUS.META && ev.Meta.Type == E_META.MEASURE) {
+                    var m = new Mesure(ev.Meta.Int);
+                    var temp = new DrawMeasure();
+                    temp.Tick = ev.Tick;
+                    temp.Denominator = m.denominator;
+                    temp.Numerator = m.numerator;
+                    mesureList.Add(temp);
+                }
+            }
+            if (mesureList.Count == 0) {
+                var temp = new DrawMeasure();
+                temp.Tick = 0;
+                temp.Denominator = 4;
+                temp.Numerator = 4;
+                mesureList.Add(temp);
+            }
+
+            var mesureDeno = 4;
+            var mesureNume = 4;
+            var mesureTick = 0;
+            var mesureNum = 1;
+            var mesureInterval = 3840;
+            var beatInterval = 960;
+            mDrawMeasureList.Clear();
+            foreach (var me in mesureList) {
+                for (; mesureTick < me.Tick; mesureTick += mesureInterval) {
+                    for (int beatTick = 0; beatTick < mesureInterval; beatTick += beatInterval) {
+                        if (beginTime <= mesureTick && mesureTick <= endTime) {
+                            var tempMesure = new DrawMeasure();
+                            tempMesure.Type = beatTick == 0 ? E_MEASURE.MEASURE : E_MEASURE.BEAT;
+                            tempMesure.Tick = mesureTick + beatTick;
+                            tempMesure.Denominator = mesureDeno;
+                            tempMesure.Numerator = mesureNume;
+                            tempMesure.Number = mesureNum;
+                            mDrawMeasureList.Add(tempMesure);
+                        }
+                    }
+                    mesureNum++;
+                }
+                mesureDeno = me.Denominator;
+                mesureNume = me.Numerator;
+                mesureInterval = 3840 * mesureNume / mesureDeno;
+                beatInterval = 3840 / mesureDeno;
+            }
+
+            for (; mesureTick <= endTime; mesureTick += mesureInterval) {
+                for (int beatTick = 0; beatTick < mesureInterval; beatTick += beatInterval) {
+                    if (beginTime <= mesureTick && mesureTick <= endTime) {
+                        var tempMesure = new DrawMeasure();
+                        tempMesure.Type = beatTick == 0 ? E_MEASURE.MEASURE : E_MEASURE.BEAT;
+                        tempMesure.Tick = mesureTick + beatTick;
+                        tempMesure.Denominator = mesureDeno;
+                        tempMesure.Numerator = mesureNume;
+                        tempMesure.Number = mesureNum;
+                        mDrawMeasureList.Add(tempMesure);
+                    }
+                }
+                mesureNum++;
             }
         }
     }
