@@ -14,17 +14,9 @@ using SMF;
 
 namespace PianoRoll {
     public partial class Form1 : Form {
-        private enum E_MEASURE {
-            MEASURE,
-            BEAT,
-            SUB
-        }
-
         private struct DrawMeasure {
-            public E_MEASURE Type;
+            public bool IsBar;
             public int Tick;
-            public int Numerator;
-            public int Denominator;
             public int Number;
         }
 
@@ -127,7 +119,7 @@ namespace PianoRoll {
         private List<Event> mEventList = new List<Event>();
 
         public List<int> DispTrack = new List<int>();
-        public int EditTrack = 9;
+        public int EditTrack = 2;
 
         public Form1() {
             InitializeComponent();
@@ -179,12 +171,50 @@ namespace PianoRoll {
             setInputMode(sender);
         }
 
+        private void setInputMode(object item) {
+            tsbRoll.Checked = false;
+            tsbRoll.Image = Properties.Resources.pianoroll_disable;
+            tsbEventList.Checked = false;
+            tsbEventList.Image = Properties.Resources.eventlist_disable;
+
+            var obj = (ToolStripButton)item;
+            obj.Checked = true;
+
+            switch (obj.Name) {
+            case "tsbRoll":
+                tsbRoll.Image = Properties.Resources.pianoroll;
+                break;
+            case "tsbEventList":
+                tsbEventList.Image = Properties.Resources.eventlist;
+                break;
+            }
+        }
+
         private void tsbSelect_Click(object sender, EventArgs e) {
             setSelectWrite(tsbSelect);
         }
 
         private void tsbWrite_Click(object sender, EventArgs e) {
             setSelectWrite(tsbWrite);
+        }
+
+        private void setSelectWrite(object item) {
+            tsbWrite.Checked = false;
+            tsbWrite.Image = Properties.Resources.write_disable;
+            tsbSelect.Checked = false;
+            tsbSelect.Image = Properties.Resources.select_disable;
+
+            var obj = (ToolStripButton)item;
+            obj.Checked = true;
+
+            switch (obj.Name) {
+            case "tsbWrite":
+                tsbWrite.Image = Properties.Resources.write;
+                break;
+            case "tsbSelect":
+                tsbSelect.Image = Properties.Resources.select;
+                break;
+            }
         }
 
         #region tsmTick event
@@ -246,6 +276,45 @@ namespace PianoRoll {
 
         private void tsmTick024_Click(object sender, EventArgs e) {
             setTimeDiv(sender);
+        }
+
+        private void setTimeDiv(object item) {
+            tsmTick960.Checked = false;
+            tsmTick480.Checked = false;
+            tsmTick240.Checked = false;
+            tsmTick120.Checked = false;
+            tsmTick060.Checked = false;
+
+            tsmTick640.Checked = false;
+            tsmTick320.Checked = false;
+            tsmTick160.Checked = false;
+            tsmTick080.Checked = false;
+            tsmTick040.Checked = false;
+
+            tsmTick384.Checked = false;
+            tsmTick192.Checked = false;
+            tsmTick096.Checked = false;
+            tsmTick048.Checked = false;
+            tsmTick024.Checked = false;
+
+            var obj = (ToolStripMenuItem)item;
+            obj.Checked = true;
+            tsdTimeDiv.Image = obj.Image;
+            tsdTimeDiv.ToolTipText = string.Format("入力単位({0})", obj.Text);
+
+            mTimeSnap = Snaps[obj.Text];
+            if (mTimeSnap % 15 == 0) {
+                mQuarterNoteWidth = 96;
+            } else if (mTimeSnap % 5 == 0) {
+                mQuarterNoteWidth = 96;
+            } else if (mTimeSnap % 3 == 0) {
+                mQuarterNoteWidth = 120;
+            }
+
+            hScroll.LargeChange = mTimeSnap;
+            hScroll.SmallChange = mTimeSnap;
+
+            drawRoll();
         }
         #endregion
 
@@ -317,6 +386,36 @@ namespace PianoRoll {
         private void tsmEditModeTempo_Click(object sender, EventArgs e) {
             setEditMode(sender);
         }
+
+        private void setEditMode(object item) {
+            tsmEditModeNote.Checked = false;
+            tsmEditModeInst.Checked = false;
+            tsmEditModeVol.Checked = false;
+            tsmEditModeExp.Checked = false;
+            tsmEditModePan.Checked = false;
+            tsmEditModePitch.Checked = false;
+            tsmEditModeVib.Checked = false;
+            tsmEditModeVibDep.Checked = false;
+            tsmEditModeVibRate.Checked = false;
+            tsmEditModeRev.Checked = false;
+            tsmEditModeDel.Checked = false;
+            tsmEditModeDelDep.Checked = false;
+            tsmEditModeDelTime.Checked = false;
+            tsmEditModeCho.Checked = false;
+            tsmEditModeFc.Checked = false;
+            tsmEditModeFq.Checked = false;
+            tsmEditModeAttack.Checked = false;
+            tsmEditModeRelease.Checked = false;
+            tsmEditModeTempo.Checked = false;
+
+            var obj = (ToolStripMenuItem)item;
+            obj.Checked = true;
+            tsdEditMode.Image = obj.Image;
+            tsdEditMode.ToolTipText = string.Format("入力種別({0})", obj.Text);
+
+            tsmEditModeVib.Checked = tsmEditModeVibDep.Checked | tsmEditModeVibRate.Checked;
+            tsmEditModeDel.Checked = tsmEditModeDelDep.Checked | tsmEditModeDelTime.Checked;
+        }
         #endregion
 
         #region picRoll event
@@ -355,6 +454,9 @@ namespace PianoRoll {
                 if (tsbWrite.Checked && tsmEditModeNote.Checked) {
                     addNoteEvent();
                     putDrawEvents();
+                }
+                if (tsbSelect.Checked && tsmEditModeNote.Checked) {
+                    mIsSelect = true;
                 }
                 mIsDrag = false;
                 break;
@@ -601,113 +703,6 @@ namespace PianoRoll {
             drawRoll();
         }
 
-        private void setInputMode(object item) {
-            tsbRoll.Checked = false;
-            tsbRoll.Image = Properties.Resources.pianoroll_disable;
-            tsbEventList.Checked = false;
-            tsbEventList.Image = Properties.Resources.eventlist_disable;
-
-            var obj = (ToolStripButton)item;
-            obj.Checked = true;
-
-            switch (obj.Name) {
-            case "tsbRoll":
-                tsbRoll.Image = Properties.Resources.pianoroll;
-                break;
-            case "tsbEventList":
-                tsbEventList.Image = Properties.Resources.eventlist;
-                break;
-            }
-        }
-
-        private void setSelectWrite(object item) {
-            tsbWrite.Checked = false;
-            tsbWrite.Image = Properties.Resources.write_disable;
-            tsbSelect.Checked = false;
-            tsbSelect.Image = Properties.Resources.select_disable;
-
-            var obj = (ToolStripButton)item;
-            obj.Checked = true;
-
-            switch (obj.Name) {
-            case "tsbWrite":
-                tsbWrite.Image = Properties.Resources.write;
-                break;
-            case "tsbSelect":
-                tsbSelect.Image = Properties.Resources.select;
-                break;
-            }
-        }
-
-        private void setEditMode(object item) {
-            tsmEditModeNote.Checked = false;
-            tsmEditModeInst.Checked = false;
-            tsmEditModeVol.Checked = false;
-            tsmEditModeExp.Checked = false;
-            tsmEditModePan.Checked = false;
-            tsmEditModePitch.Checked = false;
-            tsmEditModeVib.Checked = false;
-            tsmEditModeVibDep.Checked = false;
-            tsmEditModeVibRate.Checked = false;
-            tsmEditModeRev.Checked = false;
-            tsmEditModeDel.Checked = false;
-            tsmEditModeDelDep.Checked = false;
-            tsmEditModeDelTime.Checked = false;
-            tsmEditModeCho.Checked = false;
-            tsmEditModeFc.Checked = false;
-            tsmEditModeFq.Checked = false;
-            tsmEditModeAttack.Checked = false;
-            tsmEditModeRelease.Checked = false;
-            tsmEditModeTempo.Checked = false;
-
-            var obj = (ToolStripMenuItem)item;
-            obj.Checked = true;
-            tsdEditMode.Image = obj.Image;
-            tsdEditMode.ToolTipText = string.Format("入力種別({0})", obj.Text);
-
-            tsmEditModeVib.Checked = tsmEditModeVibDep.Checked | tsmEditModeVibRate.Checked;
-            tsmEditModeDel.Checked = tsmEditModeDelDep.Checked | tsmEditModeDelTime.Checked;
-        }
-
-        private void setTimeDiv(object item) {
-            tsmTick960.Checked = false;
-            tsmTick480.Checked = false;
-            tsmTick240.Checked = false;
-            tsmTick120.Checked = false;
-            tsmTick060.Checked = false;
-
-            tsmTick640.Checked = false;
-            tsmTick320.Checked = false;
-            tsmTick160.Checked = false;
-            tsmTick080.Checked = false;
-            tsmTick040.Checked = false;
-
-            tsmTick384.Checked = false;
-            tsmTick192.Checked = false;
-            tsmTick096.Checked = false;
-            tsmTick048.Checked = false;
-            tsmTick024.Checked = false;
-
-            var obj = (ToolStripMenuItem)item;
-            obj.Checked = true;
-            tsdTimeDiv.Image = obj.Image;
-            tsdTimeDiv.ToolTipText = string.Format("入力単位({0})", obj.Text);
-
-            mTimeSnap = Snaps[obj.Text];
-            if (mTimeSnap % 15 == 0) {
-                mQuarterNoteWidth = 96;
-            } else if (mTimeSnap % 5 == 0) {
-                mQuarterNoteWidth = 96;
-            } else if (mTimeSnap % 3 == 0) {
-                mQuarterNoteWidth = 120;
-            }
-
-            hScroll.LargeChange = mTimeSnap;
-            hScroll.SmallChange = mTimeSnap;
-
-            drawRoll();
-        }
-
         private void drawRoll() {
             mgRoll.Clear(Color.FromArgb(255, 255, 245));
 
@@ -739,13 +734,10 @@ namespace PianoRoll {
             // Measure
             foreach (var ev in mDrawMeasureList) {
                 var x = (ev.Tick - snapTimeScroll()) * mQuarterNoteWidth / mTimeScale;
-                switch (ev.Type) {
-                case E_MEASURE.MEASURE:
+                if (ev.IsBar) {
                     mgRoll.DrawLine(Pens.Black, x, 0, x, mBmpRoll.Height);
-                    break;
-                case E_MEASURE.BEAT:
+                } else {
                     mgRoll.DrawLine(Gray75, x, 0, x, mBmpRoll.Height);
-                    break;
                 }
             }
 
@@ -825,11 +817,9 @@ namespace PianoRoll {
                 }
             }
             foreach (var ev in mDrawMeasureList) {
-                var x = (ev.Tick - snapTimeScroll()) * mQuarterNoteWidth / mTimeScale;
-                switch (ev.Type) {
-                case E_MEASURE.MEASURE:
+                if (ev.IsBar) {
+                    var x = (ev.Tick - snapTimeScroll()) * mQuarterNoteWidth / mTimeScale;
                     mgRoll.DrawString(ev.Number.ToString(), mMeasureFont, Brushes.Black, x, 0);
-                    break;
                 }
             }
 
@@ -951,13 +941,11 @@ namespace PianoRoll {
                     for (int beatTick = 0; beatTick < mesureInterval; beatTick += beatInterval) {
                         var tick = mesureTick + beatTick;
                         if (beginTime <= tick && tick <= endTime) {
-                            var tempMesure = new DrawMeasure();
-                            tempMesure.Type = beatTick == 0 ? E_MEASURE.MEASURE : E_MEASURE.BEAT;
-                            tempMesure.Tick = tick;
-                            tempMesure.Denominator = mesureDeno;
-                            tempMesure.Numerator = mesureNume;
-                            tempMesure.Number = mesureNum;
-                            mDrawMeasureList.Add(tempMesure);
+                            var mesure = new DrawMeasure();
+                            mesure.IsBar = beatTick == 0;
+                            mesure.Tick = tick;
+                            mesure.Number = mesureNum;
+                            mDrawMeasureList.Add(mesure);
                         }
                     }
                     mesureNum++;
@@ -973,13 +961,11 @@ namespace PianoRoll {
                 for (int beatTick = 0; beatTick < mesureInterval; beatTick += beatInterval) {
                     var tick = mesureTick + beatTick;
                     if (beginTime <= tick && tick <= endTime) {
-                        var tempMesure = new DrawMeasure();
-                        tempMesure.Type = beatTick == 0 ? E_MEASURE.MEASURE : E_MEASURE.BEAT;
-                        tempMesure.Tick = tick;
-                        tempMesure.Denominator = mesureDeno;
-                        tempMesure.Numerator = mesureNume;
-                        tempMesure.Number = mesureNum;
-                        mDrawMeasureList.Add(tempMesure);
+                        var mesure = new DrawMeasure();
+                        mesure.IsBar = beatTick == 0;
+                        mesure.Tick = tick;
+                        mesure.Number = mesureNum;
+                        mDrawMeasureList.Add(mesure);
                     }
                 }
                 mesureNum++;
