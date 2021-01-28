@@ -143,7 +143,7 @@ namespace PianoRoll {
             DispTrack.Add(8);
             hScroll.Minimum = 0;
             hScroll.Maximum = 960 * 4 * 16;
-            var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\MIDI-master\\lilium作業中2.mid");
+            var s = new SMF.SMF("C:\\Users\\owner\\Desktop\\town.mid");
             foreach (var e in s.EventList) {
                 mEventList.Add(e);
             }
