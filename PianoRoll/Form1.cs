@@ -14,6 +14,14 @@ using SMF;
 
 namespace PianoRoll {
     public partial class Form1 : Form {
+        private enum E_SELECT {
+            NONE,
+            DRAG,
+            SELECT,
+            SELECT_AREA,
+            MOVE
+        }
+
         private struct DrawMeasure {
             public bool IsBar;
             public int Tick;
@@ -26,8 +34,10 @@ namespace PianoRoll {
             public int end;
             public int data1;
             public int data2;
-            public DrawNote(int track, int begin, params byte[] data) {
+            public bool selected;
+            public DrawNote(int track, bool selected, int begin, params byte[] data) {
                 this.track = track;
+                this.selected = selected;
                 this.begin = begin;
                 end = -1;
                 data1 = 2 <= data.Length ? data[1] : 0;
@@ -111,8 +121,7 @@ namespace PianoRoll {
         private int mTimeBegin;
         private int mTimeEnd;
 
-        private bool mIsDrag = false;
-        private bool mIsSelect = false;
+        private E_SELECT mSelectState = E_SELECT.NONE;
         private bool mPressAlt = false;
         private Keys mPressKey = Keys.None;
 
@@ -163,6 +172,7 @@ namespace PianoRoll {
             drawRoll();
         }
 
+        #region InputMode event
         private void tsbRoll_Click(object sender, EventArgs e) {
             setInputMode(sender);
         }
@@ -189,7 +199,9 @@ namespace PianoRoll {
                 break;
             }
         }
+        #endregion
 
+        #region SelectWrite event
         private void tsbSelect_Click(object sender, EventArgs e) {
             setSelectWrite(tsbSelect);
         }
@@ -215,7 +227,10 @@ namespace PianoRoll {
                 tsbSelect.Image = Properties.Resources.select;
                 break;
             }
+
+            mSelectState = E_SELECT.NONE;
         }
+        #endregion
 
         #region tsmTick event
         private void tsmTick960_Click(object sender, EventArgs e) {
@@ -415,6 +430,8 @@ namespace PianoRoll {
 
             tsmEditModeVib.Checked = tsmEditModeVibDep.Checked | tsmEditModeVibRate.Checked;
             tsmEditModeDel.Checked = tsmEditModeDelDep.Checked | tsmEditModeDelTime.Checked;
+
+            mSelectState = E_SELECT.NONE;
         }
         #endregion
 
@@ -426,7 +443,21 @@ namespace PianoRoll {
             case MouseButtons.Left:
                 mTimeBegin = snapTimeScroll(mCursor.X);
                 mToneBegin = 127 + vScroll.Minimum - vScroll.Value - mCursor.Y / mToneHeight;
-                mIsDrag = true;
+                mTimeEnd = mTimeBegin;
+                mToneEnd = mToneBegin;
+                if (tsbWrite.Checked) {
+                    if (hasGrippedNote()) {
+                        mSelectState = E_SELECT.SELECT;
+                    } else {
+                        mSelectState = E_SELECT.DRAG;
+                    }
+                } else {
+                    if (hasSelectedGripNote()) {
+                        mSelectState = E_SELECT.SELECT_AREA;
+                    } else {
+                        mSelectState = E_SELECT.DRAG;
+                    }
+                }
                 break;
             }
         }
@@ -455,23 +486,26 @@ namespace PianoRoll {
                     addNoteEvent();
                     putDrawEvents();
                 }
-                if (tsbSelect.Checked && tsmEditModeNote.Checked) {
-                    mIsSelect = true;
+                if (tsbSelect.Checked) {
+                    mSelectState = E_SELECT.SELECT_AREA;
+                } else {
+                    mSelectState = E_SELECT.NONE;
                 }
-                mIsDrag = false;
                 break;
             }
         }
 
         private void picRoll_MouseMove(object sender, MouseEventArgs e) {
             snapCursor(picRoll.PointToClient(Cursor.Position));
-            mTimeEnd = snapTimeScroll(mCursor.X);
-            mToneEnd = 127 + vScroll.Minimum - vScroll.Value - mCursor.Y / mToneHeight;
-            if (mToneEnd < 0) {
-                mToneEnd = 0;
-            }
-            if (tsbWrite.Checked) {
-                mToneBegin = mToneEnd;
+            if (mSelectState == E_SELECT.DRAG) {
+                mTimeEnd = snapTimeScroll(mCursor.X);
+                mToneEnd = 127 + vScroll.Minimum - vScroll.Value - mCursor.Y / mToneHeight;
+                if (mToneEnd < 0) {
+                    mToneEnd = 0;
+                }
+                if (tsbWrite.Checked) {
+                    mToneBegin = mToneEnd;
+                }
             }
         }
 
@@ -518,6 +552,9 @@ namespace PianoRoll {
             mPressAlt = false;
 
             switch(e.KeyCode) {
+            case Keys.Escape:
+                mSelectState = E_SELECT.NONE;
+                break;
             case Keys.F1:
                 setSelectWrite(tsbWrite);
                 break;
@@ -599,37 +636,62 @@ namespace PianoRoll {
         }
         #endregion
 
+        private bool hasGrippedNote() {
+            foreach (var ev in mDrawNoteList) {
+                if (ev.data1 == mToneEnd) {
+                    if (ev.begin <= mTimeEnd && mTimeEnd < ev.end) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private bool hasSelectedGripNote() {
+            foreach (var ev in mDrawNoteList) {
+                if (ev.data1 == mToneEnd) {
+                    if (ev.selected && ev.begin <= mTimeEnd && mTimeEnd < ev.end) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private int snapTimeScroll(int x = 0) {
             return hScroll.Value / mTimeSnap * mTimeSnap + mTimeScale * x / mQuarterNoteWidth;
         }
 
         private void snapCursor(Point pos) {
-            if (picRoll.Width <= pos.X) {
-                pos.X = picRoll.Width - 1;
-                if (mIsDrag && hScroll.Value + hScroll.SmallChange < hScroll.Maximum) {
-                    hScroll.Value += hScroll.SmallChange;
+            if (mSelectState == E_SELECT.DRAG) {
+                if (picRoll.Width <= pos.X) {
+                    pos.X = picRoll.Width - 1;
+                    if (hScroll.Value + hScroll.SmallChange < hScroll.Maximum) {
+                        hScroll.Value += hScroll.SmallChange;
+                    }
                 }
-            }
-            if (pos.X < 0) {
-                pos.X = 0;
-                if (mIsDrag && 0 <= hScroll.Value - hScroll.SmallChange) {
-                    hScroll.Value -= hScroll.SmallChange;
+                if (pos.X < 0) {
+                    pos.X = 0;
+                    if (0 <= hScroll.Value - hScroll.SmallChange) {
+                        hScroll.Value -= hScroll.SmallChange;
+                    }
                 }
             }
             var divX = mQuarterNoteWidth * mTimeSnap / mTimeScale;
             pos.X = pos.X / divX * divX;
 
-
-            if (picRoll.Height <= pos.Y) {
-                pos.Y = picRoll.Height - 1;
-                if (tsbSelect.Checked && mIsDrag && vScroll.Value < vScroll.Maximum) {
-                    vScroll.Value++;
+            if (mSelectState == E_SELECT.DRAG && tsbSelect.Checked) {
+                if (picRoll.Height <= pos.Y) {
+                    pos.Y = picRoll.Height - 1;
+                    if (vScroll.Value < vScroll.Maximum) {
+                        vScroll.Value++;
+                    }
                 }
-            }
-            if (pos.Y < 0) {
-                pos.Y = 0;
-                if (tsbSelect.Checked && mIsDrag && vScroll.Minimum <= vScroll.Value - 1) {
-                    vScroll.Value--;
+                if (pos.Y < 0) {
+                    pos.Y = 0;
+                    if (vScroll.Minimum <= vScroll.Value - 1) {
+                        vScroll.Value--;
+                    }
                 }
             }
             var ofsY = mBmpRoll.Height % mToneHeight;
@@ -762,11 +824,15 @@ namespace PianoRoll {
                 var x2 = (ev.end - snapTimeScroll()) * mQuarterNoteWidth / mTimeScale;
                 var y1 = mToneHeight * tone + ofsY;
                 var y2 = mToneHeight * (tone + 1) + ofsY;
-                drawNote(x1, y1, x2, y2);
+                if (ev.selected) {
+                    drawSelectedNote(x1, y1, x2, y2);
+                } else {
+                    drawNote(x1, y1, x2, y2);
+                }
             }
 
             // EditingNote
-            if (mIsDrag) {
+            if (mSelectState == E_SELECT.DRAG) {
                 var x1 = (mTimeBegin - snapTimeScroll()) * mQuarterNoteWidth / mTimeScale;
                 var x2 = (mTimeEnd - snapTimeScroll()) * mQuarterNoteWidth / mTimeScale;
                 if (x1 <= x2) {
@@ -780,6 +846,9 @@ namespace PianoRoll {
                     var tmp = x2;
                     x2 = x1;
                     x1 = tmp;
+                    mgRoll.DrawLine(Pens.Red, x1, 0, x1, mBmpRoll.Height);
+                } else {
+                    mgRoll.DrawLine(Pens.Red, x2, 0, x2, mBmpRoll.Height);
                 }
 
                 var y1 = (127 + vScroll.Minimum - vScroll.Value - mToneBegin) * mToneHeight + ofsY;
@@ -846,6 +915,13 @@ namespace PianoRoll {
             mgRoll.DrawLine(BackToneColorH, x1, y1, x1, y2 - 1);
         }
 
+        private void drawSelectedNote(int x1, int y1, int x2, int y2) {
+            x1 += 1;
+            y1 += 1;
+            mgRoll.FillRectangle(Brushes.Black, x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+            mgRoll.DrawRectangle(Pens.Red, x1, y1, x2 - x1, y2 - y1);
+        }
+
         private void addNoteEvent() {
             var noteOnList = new List<DrawNote>();
             foreach (var ev in mEventList) {
@@ -869,7 +945,7 @@ namespace PianoRoll {
                     break;
                 case E_STATUS.NOTE_ON:
                     if (mToneBegin == ev.Data[1] && ev.Tick <= mTimeEnd) {
-                        noteOnList.Add(new DrawNote(ev.Track, ev.Tick, ev.Data));
+                        noteOnList.Add(new DrawNote(ev.Track, false, ev.Tick, ev.Data)); 
                     }
                     break;
                 }
@@ -906,6 +982,10 @@ namespace PianoRoll {
                         if (dispEv.track == ev.Track && dispEv.data1 == ev.Data[1]) {
                             if (beginTime <= ev.Tick) {
                                 dispEv.end = ev.Tick;
+                                if (mSelectState == E_SELECT.SELECT) {
+                                    dispEv.selected = dispEv.data1 == mToneEnd
+                                        && dispEv.begin <= mTimeEnd && mTimeEnd < dispEv.end;
+                                }
                                 mDrawNoteList.Add(dispEv);
                             }
                             dispNoteList.RemoveAt(i);
@@ -915,7 +995,11 @@ namespace PianoRoll {
                     break;
                 case E_STATUS.NOTE_ON:
                     if (ev.Tick <= endTime) {
-                        dispNoteList.Add(new DrawNote(ev.Track, ev.Tick, ev.Data));
+                        var selected = mSelectState == E_SELECT.SELECT_AREA
+                            && EditTrack == ev.Track
+                            && mTimeBegin <= ev.Tick && ev.Tick <= mTimeEnd
+                            && mToneBegin <= ev.Data[1] && ev.Data[1] <= mToneEnd;
+                        dispNoteList.Add(new DrawNote(ev.Track, selected, ev.Tick, ev.Data));
                     }
                     break;
                 }
