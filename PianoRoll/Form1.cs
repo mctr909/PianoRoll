@@ -21,13 +21,13 @@ namespace PianoRoll {
         }
 
         private struct DrawNote {
-            public bool isEditTrack;
+            public int track;
             public int begin;
             public int end;
             public int data1;
             public int data2;
-            public DrawNote(bool isEditTrack, int begin, params byte[] data) {
-                this.isEditTrack = isEditTrack;
+            public DrawNote(int track, int begin, params byte[] data) {
+                this.track = track;
                 this.begin = begin;
                 end = -1;
                 data1 = 2 <= data.Length ? data[1] : 0;
@@ -143,7 +143,7 @@ namespace PianoRoll {
             DispTrack.Add(8);
             hScroll.Minimum = 0;
             hScroll.Maximum = 960 * 4 * 16;
-            var s = new SMF.SMF("C:\\Users\\owner\\Desktop\\town.mid");
+            var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\Media\\town.mid");
             foreach (var e in s.EventList) {
                 mEventList.Add(e);
             }
@@ -743,7 +743,7 @@ namespace PianoRoll {
 
             // Note
             foreach (var ev in mDrawNoteList) {
-                if (ev.isEditTrack) {
+                if (ev.track == EditTrack) {
                     continue;
                 }
                 var tone = 127 + vScroll.Minimum - vScroll.Value - ev.data1;
@@ -754,7 +754,7 @@ namespace PianoRoll {
                 drawBackNote(x1, y1, x2, y2);
             }
             foreach (var ev in mDrawNoteList) {
-                if (!ev.isEditTrack) {
+                if (ev.track != EditTrack) {
                     continue;
                 }
                 var tone = 127 + vScroll.Minimum - vScroll.Value - ev.data1;
@@ -869,7 +869,7 @@ namespace PianoRoll {
                     break;
                 case E_STATUS.NOTE_ON:
                     if (mToneBegin == ev.Data[1] && ev.Tick <= mTimeEnd) {
-                        noteOnList.Add(new DrawNote(true, ev.Tick, ev.Data));
+                        noteOnList.Add(new DrawNote(ev.Track, ev.Tick, ev.Data));
                     }
                     break;
                 }
@@ -903,7 +903,7 @@ namespace PianoRoll {
                 case E_STATUS.NOTE_OFF:
                     for (int i = 0; i < dispNoteList.Count; i++) {
                         var dispEv = dispNoteList[i];
-                        if (dispEv.data1 == ev.Data[1]) {
+                        if (dispEv.track == ev.Track && dispEv.data1 == ev.Data[1]) {
                             if (beginTime <= ev.Tick) {
                                 dispEv.end = ev.Tick;
                                 mDrawNoteList.Add(dispEv);
@@ -915,12 +915,7 @@ namespace PianoRoll {
                     break;
                 case E_STATUS.NOTE_ON:
                     if (ev.Tick <= endTime) {
-                        if (ev.Track == EditTrack) {
-                            dispNoteList.Add(new DrawNote(true, ev.Tick, ev.Data));
-                        }
-                        if (DispTrack.Contains(ev.Track)) {
-                            dispNoteList.Add(new DrawNote(false, ev.Tick, ev.Data));
-                        }
+                        dispNoteList.Add(new DrawNote(ev.Track, ev.Tick, ev.Data));
                     }
                     break;
                 }
