@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("PianoRoll")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("ソニー株式会社")]
+[assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("PianoRoll")]
-[assembly: AssemblyCopyright("Copyright © ソニー株式会社 2021")]
+[assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

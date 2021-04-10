@@ -88,9 +88,9 @@ namespace PianoRoll {
 
         private static readonly Brush SolidToneColor = new Pen(Color.FromArgb(255, 10, 224, 10), 1.0f).Brush;
         private static readonly Pen SolidToneColorH = new Pen(Color.FromArgb(255, 105, 245, 105), 1.0f);
-        private static readonly Pen SolidToneColorL = new Pen(Color.FromArgb(255, 15, 177, 15), 1.0f);
+        private static readonly Pen SolidToneColorL = new Pen(Color.FromArgb(255, 15, 167, 15), 1.0f);
 
-        private static readonly Brush BackToneColor = new Pen(Color.FromArgb(255, 10, 214, 214), 1.0f).Brush;
+        private static readonly Brush BackToneColor = new Pen(Color.FromArgb(255, 47, 224, 224), 1.0f).Brush;
         private static readonly Pen BackToneColorH = new Pen(Color.FromArgb(255, 95, 245, 245), 1.0f);
         private static readonly Pen BackToneColorL = new Pen(Color.FromArgb(255, 15, 167, 167), 1.0f);
 
@@ -152,11 +152,11 @@ namespace PianoRoll {
             DispTrack.Add(8);
             hScroll.Minimum = 0;
             hScroll.Maximum = 960 * 4 * 16;
-            var s = new SMF.SMF("C:\\Users\\9004054911\\Desktop\\Media\\town.mid");
-            foreach (var e in s.EventList) {
-                mEventList.Add(e);
-            }
-            hScroll.Maximum = s.MaxTime;
+            //var s = new SMF.SMF("C:\\Users\\owner\\Desktop\\town.mid");
+            //foreach (var e in s.EventList) {
+            //    mEventList.Add(e);
+            //}
+            //hScroll.Maximum = s.MaxTime;
 
             timer1.Interval = 16;
             timer1.Enabled = true;
@@ -898,9 +898,9 @@ namespace PianoRoll {
         private void drawNote(int x1, int y1, int x2, int y2) {
             x1 += 1;
             y1 += 1;
-            mgRoll.FillRectangle(SolidToneColor, x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+            mgRoll.FillRectangle(SolidToneColor, x1, y1, x2 - x1, y2 - y1 + 1);
             mgRoll.DrawLine(SolidToneColorL, x1, y2, x2, y2);
-            mgRoll.DrawLine(SolidToneColorH, x1, y1, x2 - 1, y1);
+            mgRoll.DrawLine(SolidToneColorH, x1, y1, x2, y1);
             mgRoll.DrawLine(SolidToneColorL, x2, y2, x2, y1 + 1);
             mgRoll.DrawLine(SolidToneColorH, x1, y1, x1, y2 - 1);
         }
@@ -908,9 +908,9 @@ namespace PianoRoll {
         private void drawBackNote(int x1, int y1, int x2, int y2) {
             x1 += 1;
             y1 += 1;
-            mgRoll.FillRectangle(BackToneColor, x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+            mgRoll.FillRectangle(BackToneColor, x1, y1, x2 - x1, y2 - y1 + 1);
             mgRoll.DrawLine(BackToneColorL, x1, y2, x2, y2);
-            mgRoll.DrawLine(BackToneColorH, x1, y1, x2 - 1, y1);
+            mgRoll.DrawLine(BackToneColorH, x1, y1, x2, y1);
             mgRoll.DrawLine(BackToneColorL, x2, y2, x2, y1 + 1);
             mgRoll.DrawLine(BackToneColorH, x1, y1, x1, y2 - 1);
         }
